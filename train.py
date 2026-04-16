@@ -297,6 +297,9 @@ class ASP(nn.Module):
             "label_scaler_state": self.label_scaler.state_dict(),
             "feature_scaler_state": get_state_dict(self.feat_scaler),
             "model_name": model_name,
+            "in_dims": self.in_dims,
+            "hidden_dims": self.hidden_dims,
+            "out_dims": self.out_dims,
         }
         torch.save(self.network, path)
 
@@ -321,6 +324,11 @@ class ASP(nn.Module):
             network = torch.load(path, map_location=self.compute_device, weights_only=False)
         else:
             network = model_data
+        
+        # Restore architecture from checkpoint (allows inference without training data)
+        self.in_dims = network.get("in_dims", self.in_dims)
+        self.hidden_dims = network.get("hidden_dims", self.hidden_dims)
+        self.out_dims = network.get("out_dims", self.out_dims)
         
         if self.model is None:
             self.model = ASPModel(
