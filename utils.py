@@ -67,11 +67,20 @@ def ttv_split(df,
 class Scaler:
     def __init__(self, data):
         self.data = torch.as_tensor(data)
+        # Handle 1D case 
+        if self.data.dim() == 1:
+            self.data = self.data.unsqueeze(1)
         means = []
         stds = []
-        for column in self.data.T:
-            means.append(torch.mean(column))
-            stds.append(torch.std(column))
+        # Use mT for transpose (avoids deprecation warning)
+        for column in self.data.mT:
+            mean_val = torch.mean(column)
+            std_val = torch.std(column)
+            # Avoid division by zero for constant columns
+            if std_val < 1e-8:
+                std_val = torch.tensor(1.0, device=std_val.device)
+            means.append(mean_val)
+            stds.append(std_val)
         self.means = torch.as_tensor(means)
         self.stds = torch.as_tensor(stds)
         

@@ -318,9 +318,18 @@ class ASP(nn.Module):
         """
         if type(model_data) is str:
             path = join("models", "trained_models", model_data)
-            network = torch.load(path, map_location=self.compute_device)
+            network = torch.load(path, map_location=self.compute_device, weights_only=False)
         else:
             network = model_data
+        
+        if self.model is None:
+            self.model = ASPModel(
+                in_dims=self.in_dims,
+                hidden_dims=self.hidden_dims,
+                out_dims=self.out_dims,
+                compute_device=self.compute_device,
+            ).to(self.compute_device)
+        
         assert isinstance(self.model, ASPModel)
         optimizer =torch.optim.Adam(params=self.model.parameters())
         self.optimizer = Lookahead(base_optimizer=optimizer)

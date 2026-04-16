@@ -2,7 +2,7 @@
 	"model_name": "asp_model",
 	"hidden_dims": [256,128,64,32,16,32],
 	"batch_size": 64,
-	"epochs": 500,
+	"epochs": 40,
 	"out_dims": 40,
 	"val_size": 0.22,
       	"test_size": 0,
