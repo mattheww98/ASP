@@ -56,7 +56,8 @@ class ASP(nn.Module):
         alpha: float = 0.5,
         k: int = 6,
         save: bool = True,
-        save_size: int = 10
+        save_size: int = 10,
+        shuffle: bool = True
     ):
         super().__init__()
         self.model = model
@@ -74,7 +75,7 @@ class ASP(nn.Module):
         self.test_size = test_size
         self.batch_size = batch_size
         self.epochs = epochs
-        self.epochs_step = 10
+        self.epochs_step = epochs_step
         self.checkin = checkin
         self.discard_n = early_stop
         self.criterion = criterion
@@ -88,6 +89,7 @@ class ASP(nn.Module):
         self.save = save
         self.data_type_torch=torch.float32
         self.save_size = save_size
+        self.shuffle = shuffle
 
         
         print("\nModel architecture: feature dimensions, no. hidden layers, output dimensions")
@@ -363,7 +365,6 @@ class ASP(nn.Module):
         self,
         data: None,
         batch_size: int = 64,
-        shuffle: bool = True,
 		test: bool = False
     ):
         """Load data using PyTorch Dataloader."""
@@ -375,7 +376,7 @@ class ASP(nn.Module):
         dataset = list(xy_split(data)) # list is [features, labels, formulae]
         dataset[0] = self.feat_scaler.transform(dataset[0]) #scale features of all data
         data_shaped = ASPDataset(dataset)
-        data_loader = DataLoader(data_shaped,batch_size=self.batch_size,shuffle=shuffle)
+        data_loader = DataLoader(data_shaped,batch_size=self.batch_size,shuffle=self.shuffle)
         return data_loader
 
 
