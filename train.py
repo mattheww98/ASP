@@ -236,8 +236,6 @@ class ASP(nn.Module):
         
         self.loss_curve: dict = {"train": [], "val": []}
 
-        self.discard_n = 20 #early stopping - but keep in mind this is only checked every {checkin} epochs 
-
         assert isinstance(self.epochs, int)
         assert isinstance(self.checkin, int)
         for epoch in range(self.epochs):
