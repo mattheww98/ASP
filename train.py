@@ -170,6 +170,8 @@ class ASP(nn.Module):
                 mae_v = mean_absolute_error(true_v, pred_v)
                 if mae_v < self.minimum_mae:
                     self.minimum_mae = mae_v
+                    self.best_model_state = self.model.state_dict().copy()
+                    self.best_model_epoch = self.epoch
                 if mae_v <= 1.01 * self.minimum_mae:
                     minima.append(True)
                 
@@ -209,6 +211,8 @@ class ASP(nn.Module):
         self.step_count = 0
         self.discard_count = 0
         self.minimum_mae = 1e9
+        self.best_model_state = None
+        self.best_model_epoch = None
         self.saved_val = {}
         self.saved_train = {}
         self.saved_mae = {}
@@ -275,33 +279,55 @@ class ASP(nn.Module):
             json.dump(self.loss_curve, outfile)
         
         if self.save:
-            self.save_network()
+            self.save_network(model_type="both")
 
-    def save_network(self, model_name: str = None):
+    def save_network(self, model_name: str = None, model_type: str = "final"):
         """Save network weights to a ``.pth`` file.
 
         Parameters
         ----------
         model_name : str, optional
             The name of the `.pth` file. If None, then use `self.model_name`. By default None
+        model_type : str, optional
+            Type of model to save: "final", "best", or "both". Default is "final"
         """
         if model_name is None:
             model_name = self.model_name
-            os.makedirs(join("models", "trained_models"), exist_ok=True)
-            path = join("models", "trained_models", f"{model_name}.pth")
-        print(f"Saving network ({model_name}) to {path}")
-
-        assert isinstance(self.model, ASPModel)
-        self.network = {
-            "weights": self.model.state_dict(),
-            "label_scaler_state": self.label_scaler.state_dict(),
-            "feature_scaler_state": get_state_dict(self.feat_scaler),
-            "model_name": model_name,
-            "in_dims": self.in_dims,
-            "hidden_dims": self.hidden_dims,
-            "out_dims": self.out_dims,
-        }
-        torch.save(self.network, path)
+        
+        os.makedirs(join("models", "trained_models"), exist_ok=True)
+        
+        def save_single_model(state_dict, save_name):
+            """Helper function to save a single model"""
+            path = join("models", "trained_models", f"{save_name}.pth")
+            print(f"Saving network ({save_name}) to {path}")
+            
+            assert isinstance(self.model, ASPModel)
+            network = {
+                "weights": state_dict,
+                "label_scaler_state": self.label_scaler.state_dict(),
+                "feature_scaler_state": get_state_dict(self.feat_scaler),
+                "model_name": model_name,
+                "in_dims": self.in_dims,
+                "hidden_dims": self.hidden_dims,
+                "out_dims": self.out_dims,
+            }
+            torch.save(network, path)
+        
+        if model_type == "final":
+            save_single_model(self.model.state_dict(), model_name)
+        elif model_type == "best":
+            if self.best_model_state is not None:
+                save_single_model(self.best_model_state, f"{model_name}_best")
+            else:
+                print("No best model available to save")
+        elif model_type == "both":
+            save_single_model(self.model.state_dict(), model_name)
+            if self.best_model_state is not None:
+                save_single_model(self.best_model_state, f"{model_name}_best")
+            else:
+                print("No best model available to save")
+        else:
+            raise ValueError("model_type must be 'final', 'best', or 'both'")
 
     def load_network(self, model_data: Union[str, dict],old_pth=False):
         """Load network weights from a ``.pth`` file.
