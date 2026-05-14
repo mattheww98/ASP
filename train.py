@@ -57,7 +57,8 @@ class ASP(nn.Module):
         k: int = 6,
         save: bool = True,
         save_size: int = 10,
-        shuffle: bool = True
+        shuffle: bool = True,
+        seed: int = 42
     ):
         super().__init__()
         self.model = model
@@ -90,6 +91,7 @@ class ASP(nn.Module):
         self.data_type_torch=torch.float32
         self.save_size = save_size
         self.shuffle = shuffle
+        self.seed = seed
 
         
         print("\nModel architecture: feature dimensions, no. hidden layers, output dimensions")
@@ -377,7 +379,7 @@ class ASP(nn.Module):
         self
     ):
         df = featurize(self.input_data)
-        loader = ttv_split(df,val_size=self.val_size,test_size=self.test_size) #members of list are train_df, val_df, and test_df    
+        loader = ttv_split(df,val_size=self.val_size,test_size=self.test_size,random_state=self.seed) #members of list are train_df, val_df, and test_df    
         x,y,form = xy_split(loader[0])
         scaler = StandardScaler()
         self.feat_scaler = scaler.fit(x) #set up feature scaler for scaling all features based just on training features
