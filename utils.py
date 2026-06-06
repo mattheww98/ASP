@@ -65,45 +65,96 @@ def ttv_split(df,
 
 
 class Scaler:
-    def __init__(self, data):
-        self.data = torch.as_tensor(data)
-        # Handle 1D case 
-        if self.data.dim() == 1:
-            self.data = self.data.unsqueeze(1)
-        means = []
-        stds = []
-        # Use mT for transpose (avoids deprecation warning)
-        for column in self.data.mT:
-            mean_val = torch.mean(column)
-            std_val = torch.std(column)
-            # Avoid division by zero for constant columns
-            if std_val < 1e-8:
-                std_val = torch.tensor(1.0, device=std_val.device)
-            means.append(mean_val)
-            stds.append(std_val)
-        self.means = torch.as_tensor(means)
-        self.stds = torch.as_tensor(stds)
-        
+    METHODS = {"z", "log", "minmax", "median"}
+    ALIASES = {"z-score": "z", "zscore": "z", "min-max": "minmax"}
+
+    def __init__(self, data, method="z"):
+        self.method = self.ALIASES.get(method.lower(), method.lower())
+        if self.method not in self.METHODS:
+            raise ValueError(
+                f"Unknown label scaling method '{method}'. "
+                f"Choose from {sorted(self.METHODS)}."
+            )
+
+        data = torch.as_tensor(data)
+        if data.dim() == 1:
+            data = data.unsqueeze(1)
+
+        if self.method == "z":
+            self.means = torch.mean(data, dim=0)
+            self.stds = torch.std(data, dim=0)
+            self.stds = torch.where(
+                self.stds < 1e-8, torch.ones_like(self.stds), self.stds
+            )
+        elif self.method == "log":
+            if torch.any(data < 0):
+                raise ValueError("Log label scaling requires non-negative labels.")
+        elif self.method == "minmax":
+            self.mins = torch.amin(data, dim=0)
+            self.ranges = torch.amax(data, dim=0) - self.mins
+            self.ranges = torch.where(
+                self.ranges < 1e-8, torch.ones_like(self.ranges), self.ranges
+            )
+        elif self.method == "median":
+            self.median_max = torch.quantile(torch.amax(data, dim=1), 0.5)
+            if torch.abs(self.median_max) < 1e-8:
+                raise ValueError(
+                    "Median label scaling requires a non-zero median of spectrum maxima."
+                )
+
+    def _on_device(self, name, data):
+        return getattr(self, name).to(device=data.device, dtype=data.dtype)
+
     def scale(self, data):
         data = torch.as_tensor(data)
-        self.stds = self.stds.to(data.device)
-        self.means = self.means.to(data.device)
-        data_scaled=(data-self.means)/self.stds
-        return data_scaled
+        if self.method == "z":
+            return (
+                data - self._on_device("means", data)
+            ) / self._on_device("stds", data)
+        if self.method == "log":
+            if torch.any(data < 0):
+                raise ValueError("Log label scaling requires non-negative labels.")
+            return torch.log1p(data)
+        if self.method == "minmax":
+            return (
+                data - self._on_device("mins", data)
+            ) / self._on_device("ranges", data)
+        return data / self._on_device("median_max", data)
 
     def unscale(self, data_scaled):
         data_scaled = torch.as_tensor(data_scaled)
-        self.stds = self.stds.to(data_scaled.device)
-        self.means = self.means.to(data_scaled.device)
-        data = data_scaled*self.stds + self.means
-        return data
+        if self.method == "z":
+            return (
+                data_scaled * self._on_device("stds", data_scaled)
+                + self._on_device("means", data_scaled)
+            )
+        if self.method == "log":
+            return torch.expm1(data_scaled)
+        if self.method == "minmax":
+            return (
+                data_scaled * self._on_device("ranges", data_scaled)
+                + self._on_device("mins", data_scaled)
+            )
+        return data_scaled * self._on_device("median_max", data_scaled)
 
     def state_dict(self):
-        return {"means": self.means, "stds": self.stds}
+        state = {"method": self.method}
+        if self.method == "z":
+            state.update({"means": self.means, "stds": self.stds})
+        elif self.method == "minmax":
+            state.update({"mins": self.mins, "ranges": self.ranges})
+        elif self.method == "median":
+            state["median_max"] = self.median_max
+        return state
 
     def load_state_dict(self, state_dict):
-        self.means = state_dict["means"]
-        self.stds = state_dict["stds"]
+        # Checkpoints created before scaling options were added are z-scaled.
+        self.method = state_dict.get("method", "z")
+        if self.method not in self.METHODS:
+            raise ValueError(f"Unknown label scaling method '{self.method}' in checkpoint.")
+        for name in ("means", "stds", "mins", "ranges", "median_max"):
+            if name in state_dict:
+                setattr(self, name, state_dict[name])
 
 def count_parameters(model):
     return sum(p.numel() for p in model.parameters() if p.requires_grad)

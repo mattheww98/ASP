@@ -2,11 +2,13 @@
 	"model_name": "asp_model",
 	"hidden_dims": [256,128,64,32,16,32],
 	"batch_size": 64,
-	"epochs": 40,
+	"epochs": 500,
 	"out_dims": 40,
+	"relu": false,
+	"label_scaling": "z",
 	"val_size": 0.22,
       	"test_size": 0,
-	"early_stop": 20,	
+	"early_stop": 10,	
 	"criterion": "mse",
 	"lr": 1e-03,
 	"eps": 1e-06,
@@ -15,5 +17,6 @@
 	"alpha": 0.5,
 	"k": 6,
 	"save": true,
-	"save_size": 10
+	"save_size": 10,
+	"seed": 42
 }

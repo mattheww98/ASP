@@ -37,6 +37,8 @@ class ASP(nn.Module):
         in_dims=132, 
         hidden_dims=[1024,512,256,128],
         out_dims = 40,
+        relu: bool = False,
+        label_scaling: str = "z",
         compute_device: Optional[Union[str, torch.device]] = None,
         input_data = "input.csv",
         split: bool = True,
@@ -66,6 +68,8 @@ class ASP(nn.Module):
         self.in_dims = in_dims
         self.hidden_dims = hidden_dims
         self.out_dims = out_dims
+        self.relu = relu
+        self.label_scaling = label_scaling
         device = "cpu"
         if torch.cuda.is_available():
             device = torch.device("cuda")
@@ -198,6 +202,7 @@ class ASP(nn.Module):
                 hidden_dims = self.hidden_dims,
                 out_dims = self.out_dims,
                 compute_device=self.compute_device,
+                relu = self.relu
             ).to(self.compute_device)
         
         print(f"Model size: {count_parameters(self.model)} parameters\n")
@@ -240,7 +245,7 @@ class ASP(nn.Module):
         )
         #optimizer = Lookahead(base_optimizer=optimizer, alpha=self.alpha, k=self.k)
         
-        self.loss_curve: dict = {"train": [], "val": []}
+        self.loss_curve: dict = {"epoch": [], "train": [], "val": []}
 
         assert isinstance(self.epochs, int)
         assert isinstance(self.checkin, int)
@@ -259,6 +264,7 @@ class ASP(nn.Module):
                 mae_t = mean_absolute_error(true_t, pred_t)
                 form_v, pred_v, true_v = self.predict(loader=self.val_loader)
                 mae_v = mean_absolute_error(true_v, pred_v)
+                self.loss_curve["epoch"].append(epoch)
                 self.loss_curve["train"].append(mae_t)
                 self.loss_curve["val"].append(mae_v)
                 epoch_str = f"Epoch: {epoch}/{self.epochs} ---"
@@ -312,6 +318,7 @@ class ASP(nn.Module):
                 "in_dims": self.in_dims,
                 "hidden_dims": self.hidden_dims,
                 "out_dims": self.out_dims,
+                "relu": self.relu,
             }
             torch.save(network, path)
         
@@ -357,6 +364,7 @@ class ASP(nn.Module):
         self.in_dims = network.get("in_dims", self.in_dims)
         self.hidden_dims = network.get("hidden_dims", self.hidden_dims)
         self.out_dims = network.get("out_dims", self.out_dims)
+        self.relu = network.get("relu", self.relu)
         
         if self.model is None:
             self.model = ASPModel(
@@ -364,6 +372,7 @@ class ASP(nn.Module):
                 hidden_dims=self.hidden_dims,
                 out_dims=self.out_dims,
                 compute_device=self.compute_device,
+                relu = self.relu
             ).to(self.compute_device)
         
         assert isinstance(self.model, ASPModel)
@@ -372,6 +381,7 @@ class ASP(nn.Module):
         self.label_scaler = Scaler(torch.zeros(self.out_dims))
         self.model.load_state_dict(network["weights"])
         self.label_scaler.load_state_dict(network["label_scaler_state"])
+        self.label_scaling = self.label_scaler.method
         self.feat_scaler = load_state_dict(network["feature_scaler_state"])
         self.model_name = network["model_name"]
 
@@ -383,7 +393,7 @@ class ASP(nn.Module):
         x,y,form = xy_split(loader[0])
         scaler = StandardScaler()
         self.feat_scaler = scaler.fit(x) #set up feature scaler for scaling all features based just on training features
-        self.label_scaler = Scaler(y) #set up label scaler for scaling training labels
+        self.label_scaler = Scaler(y, method=self.label_scaling) #set up label scaler for scaling training labels
         self.train_len = len(y)
         return loader
         
