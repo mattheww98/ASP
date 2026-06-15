@@ -410,7 +410,6 @@ class ASP(nn.Module):
         if test:
             data = featurize(data)
         dataset = list(xy_split(data)) # list is [features, labels, formulae]
-        dataset[0] = self.feat_scaler.transform(dataset[0]) #scale features of all data
         data_shaped = ASPDataset(dataset)
         data_loader = DataLoader(data_shaped,batch_size=self.batch_size,shuffle=self.shuffle)
         return data_loader
