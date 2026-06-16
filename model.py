@@ -5,7 +5,8 @@ class ASPModel(nn.Module):
                  in_dims=132, 
                  hidden_dims=[1024,512,256,128],
                  out_dims = 40,
-                 compute_device=None
+                 compute_device=None,
+                 relu = False
                 ):
         super().__init__()
         self.input_dims = in_dims
@@ -16,11 +17,12 @@ class ASPModel(nn.Module):
         self.fcs = nn.ModuleList([nn.Linear(dims[i], dims[i + 1]) for i in range(len(dims) - 1)])
         self.acts = nn.ModuleList([nn.LeakyReLU() for j in range(len(dims) - 1)])
         self.fc_out = nn.Linear(dims[-1], out_dims)
+        self.output_act = nn.ReLU() if relu else nn.Identity()
 
     def forward(self, fea):
         for fc, act in zip(self.fcs, self.acts):
             fea = act(fc(fea))
-        output = self.fc_out(fea)
+        output = self.output_act(self.fc_out(fea))
         return output
 
 if __name__ == "__main__":
