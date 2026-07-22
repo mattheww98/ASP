@@ -1,1 +1,1 @@
-Absorption Spectrum Prediction model based on TLOpt and CrabNet
+Absorption Spectrum Prediction model based on [TLOpt](https://github.com/usccolumbia/TLOpt), updated to use modern PyTorch. The package structure is inspired by [CrabNet](https://github.com/anthony-wang/CrabNet/tree/master).
